@@ -16,13 +16,7 @@
 
 package org.mitre.dsmiley.httpproxy;
 
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpEntityEnclosingRequest;
-import org.apache.http.HttpHeaders;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
+import org.apache.http.*;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
@@ -34,6 +28,7 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicHttpEntityEnclosingRequest;
 import org.apache.http.message.BasicHttpRequest;
 import org.apache.http.message.HeaderGroup;
+import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.EntityUtils;
 
 import javax.servlet.ServletException;
@@ -46,10 +41,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpCookie;
 import java.net.URI;
-import java.util.BitSet;
-import java.util.Enumeration;
-import java.util.Formatter;
-import java.util.List;
+import java.util.*;
 
 /**
  * An HTTP reverse proxy/gateway servlet. It is designed to be extended for customization
@@ -117,6 +109,21 @@ public class ProxyServlet extends HttpServlet {
   protected String targetUri;
   protected URI targetUriObj;//new URI(targetUri)
   protected HttpHost targetHost;//URIUtils.extractHost(targetUriObj);
+
+  /** Interceptors we can use to customise the HttpRequest/Response as they are flowing through. **/
+  protected List<HttpRequestInterceptor> requestInterceptors = new ArrayList<HttpRequestInterceptor>();
+  protected List<HttpResponseInterceptor> responseInterceptors = new ArrayList<HttpResponseInterceptor>();
+
+
+  public ProxyServlet addRequestInterceptor(HttpRequestInterceptor interceptor) {
+    requestInterceptors.add(interceptor);
+    return this;
+  }
+
+  public ProxyServlet addResponseInterceptor(HttpResponseInterceptor interceptor) {
+    responseInterceptors.add(interceptor);
+    return this;
+  }
 
   private HttpClient proxyClient;
 
@@ -215,7 +222,10 @@ public class ProxyServlet extends HttpServlet {
    **/
   protected HttpClient createHttpClient(final RequestConfig requestConfig) {
     return HttpClientBuilder.create()
-            .setDefaultRequestConfig(requestConfig).build();
+        .addInterceptorFirst(requestInterceptorProxy)
+        .addInterceptorFirst(responseInterceptorProxy)
+        .setDefaultRequestConfig(requestConfig)
+        .build();
   }
 
   /** The http client used.
@@ -683,5 +693,23 @@ public class ProxyServlet extends HttpServlet {
 
     asciiQueryChars.set((int)'%');//leave existing percent escapes in place
   }
+
+  HttpRequestInterceptor requestInterceptorProxy = new HttpRequestInterceptor() {
+    @Override
+    public void process( HttpRequest httpRequest, HttpContext httpContext ) throws HttpException, IOException {
+      for (HttpRequestInterceptor interceptor : requestInterceptors) {
+        interceptor.process(httpRequest, httpContext);
+      }
+    }
+  };
+
+  HttpResponseInterceptor responseInterceptorProxy = new HttpResponseInterceptor() {
+    @Override
+    public void process( HttpResponse httpResponse, HttpContext httpContext ) throws HttpException, IOException {
+      for (HttpResponseInterceptor interceptor : responseInterceptors) {
+        interceptor.process(httpResponse, httpContext);
+      }
+    }
+  };
 
 }
