@@ -222,10 +222,10 @@ public class ProxyServlet extends HttpServlet {
    **/
   protected HttpClient createHttpClient(final RequestConfig requestConfig) {
     return HttpClientBuilder.create()
-        .addInterceptorFirst(requestInterceptorProxy)
-        .addInterceptorFirst(responseInterceptorProxy)
-        .setDefaultRequestConfig(requestConfig)
-        .build();
+            .addInterceptorFirst(requestInterceptorProxy)
+            .addInterceptorFirst(responseInterceptorProxy)
+            .setDefaultRequestConfig(requestConfig)
+            .build();
   }
 
   /** The http client used.
@@ -697,8 +697,12 @@ public class ProxyServlet extends HttpServlet {
   HttpRequestInterceptor requestInterceptorProxy = new HttpRequestInterceptor() {
     @Override
     public void process( HttpRequest httpRequest, HttpContext httpContext ) throws HttpException, IOException {
-      for (HttpRequestInterceptor interceptor : requestInterceptors) {
-        interceptor.process(httpRequest, httpContext);
+      try {
+        for (HttpRequestInterceptor interceptor : requestInterceptors) {
+          interceptor.process(httpRequest, httpContext);
+        }
+      } catch (Exception ex) {
+        log("requestInterceptorProxy", ex);
       }
     }
   };
@@ -706,8 +710,12 @@ public class ProxyServlet extends HttpServlet {
   HttpResponseInterceptor responseInterceptorProxy = new HttpResponseInterceptor() {
     @Override
     public void process( HttpResponse httpResponse, HttpContext httpContext ) throws HttpException, IOException {
-      for (HttpResponseInterceptor interceptor : responseInterceptors) {
-        interceptor.process(httpResponse, httpContext);
+      try {
+        for (HttpResponseInterceptor interceptor : responseInterceptors) {
+          interceptor.process(httpResponse, httpContext);
+        }
+      } catch (Exception ex) {
+        log("responseInterceptorProxy", ex);
       }
     }
   };
